@@ -17,6 +17,9 @@ enum Subcommands {
 
     /// Fetch a document from a remote repository.
     Fetch(FetchCommand),
+
+    /// Get the heads of a document.
+    Heads(HeadsCommand),
 }
 
 impl Subcommands {
@@ -24,6 +27,7 @@ impl Subcommands {
         match self {
             Subcommands::Cat(a) => a.exec().await,
             Subcommands::Fetch(a) => a.exec().await,
+            Subcommands::Heads(a) => a.exec().await,
         }
     }
 }
@@ -44,6 +48,7 @@ impl CatCommand {
 
         doc.with_document(|md| {
             let content = md.hydrate(None);
+            // TODO: pretty-print!
             println!("{content:?}");
         });
 
@@ -83,9 +88,30 @@ impl FetchCommand {
     }
 }
 
-// const PATCHWORK_STORAGE_ID: &str = "3760df37-a4c6-4f66-9ecd-732039a9385d";
-// const SAMPLE1_ID: &str = "26KaWCncuojjMJDtZNtzbQPrF3P6";
-//const SAMPLE2_ID: &str = "KGoLFkZeDgRrKr5T35Fvv2qTBkq";
+#[derive(Parser, Debug)]
+#[command()]
+struct HeadsCommand {
+    #[arg()]
+    docid: String,
+}
+
+impl HeadsCommand {
+    async fn exec(self) -> Result<()> {
+        let docid = self.docid.parse()?;
+        let repo = repo::Repository::load().await?;
+        let maybe_doc = repo.samod().find(docid).await?;
+        let doc = maybe_doc.ok_or_else(|| anyhow!("doc not found"))?;
+
+        doc.with_document(|md| {
+            for h in md.get_heads() {
+                println!("{h}");
+            }
+        });
+
+        repo.stop().await;
+        Ok(())
+    }
+}
 
 #[tokio::main]
 async fn main() {
