@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow};
+use automerge::patches::TextRepresentation;
 use clap::Parser;
 use std::{
     io::Write,
@@ -19,6 +20,9 @@ enum Subcommands {
     /// Dump a document to stdout as automerge JSON.
     Cat(CatCommand),
 
+    /// Dump a document using Automerge's internal format.
+    Dump(DumpCommand),
+
     /// Export a document in the automerge binary format
     Export(ExportCommand),
 
@@ -27,15 +31,20 @@ enum Subcommands {
 
     /// Get the heads of a document.
     Heads(HeadsCommand),
+
+    /// Dump patches bringing a document to its current state.
+    History(HistoryCommand),
 }
 
 impl Subcommands {
     async fn exec(self) -> Result<()> {
         match self {
             Subcommands::Cat(a) => a.exec().await,
+            Subcommands::Dump(a) => a.exec().await,
             Subcommands::Export(a) => a.exec().await,
             Subcommands::Fetch(a) => a.exec().await,
             Subcommands::Heads(a) => a.exec().await,
+            Subcommands::History(a) => a.exec().await,
         }
     }
 }
@@ -58,6 +67,29 @@ impl CatCommand {
             let content = md.hydrate(None);
             // TODO: pretty-print!
             println!("{content:?}");
+        });
+
+        repo.stop().await;
+        Ok(())
+    }
+}
+
+#[derive(Parser, Debug)]
+#[command()]
+struct DumpCommand {
+    #[arg()]
+    docid: String,
+}
+
+impl DumpCommand {
+    async fn exec(self) -> Result<()> {
+        let docid = self.docid.parse()?;
+        let repo = repo::Repository::load().await?;
+        let maybe_doc = repo.samod().find(docid).await?;
+        let doc = maybe_doc.ok_or_else(|| anyhow!("doc not found"))?;
+
+        doc.with_document(|md| {
+            md.dump();
         });
 
         repo.stop().await;
@@ -146,6 +178,35 @@ impl HeadsCommand {
         doc.with_document(|md| {
             for h in md.get_heads() {
                 println!("{h}");
+            }
+        });
+
+        repo.stop().await;
+        Ok(())
+    }
+}
+
+#[derive(Parser, Debug)]
+#[command()]
+struct HistoryCommand {
+    #[arg()]
+    docid: String,
+}
+
+impl HistoryCommand {
+    async fn exec(self) -> Result<()> {
+        let docid = self.docid.parse()?;
+        let repo = repo::Repository::load().await?;
+        let maybe_doc = repo.samod().find(docid).await?;
+        let doc = maybe_doc.ok_or_else(|| anyhow!("doc not found"))?;
+
+        eprintln!("XXX this causes the document to need to be refetched!\n");
+
+        doc.with_document(|md| {
+            let enc = md.text_encoding();
+
+            for patch in md.current_state(TextRepresentation::String(enc)) {
+                println!("{patch:?}");
             }
         });
 
