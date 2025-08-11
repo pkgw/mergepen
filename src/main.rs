@@ -1,5 +1,9 @@
 use anyhow::{Result, anyhow};
 use clap::Parser;
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 mod repo;
 
@@ -15,6 +19,9 @@ enum Subcommands {
     /// Dump a document to stdout as automerge JSON.
     Cat(CatCommand),
 
+    /// Export a document in the automerge binary format
+    Export(ExportCommand),
+
     /// Fetch a document from a remote repository.
     Fetch(FetchCommand),
 
@@ -26,6 +33,7 @@ impl Subcommands {
     async fn exec(self) -> Result<()> {
         match self {
             Subcommands::Cat(a) => a.exec().await,
+            Subcommands::Export(a) => a.exec().await,
             Subcommands::Fetch(a) => a.exec().await,
             Subcommands::Heads(a) => a.exec().await,
         }
@@ -51,6 +59,39 @@ impl CatCommand {
             // TODO: pretty-print!
             println!("{content:?}");
         });
+
+        repo.stop().await;
+        Ok(())
+    }
+}
+
+#[derive(Parser, Debug)]
+#[command()]
+struct ExportCommand {
+    #[arg()]
+    docid: String,
+
+    #[arg()]
+    dest_path: PathBuf,
+}
+
+impl ExportCommand {
+    async fn exec(self) -> Result<()> {
+        let docid = self.docid.parse()?;
+        let repo = repo::Repository::load().await?;
+        let maybe_doc = repo.samod().find(docid).await?;
+        let doc = maybe_doc.ok_or_else(|| anyhow!("doc not found"))?;
+
+        let mut dest: Box<dyn Write> = if self.dest_path == Path::new("-") {
+            Box::new(std::io::stdout().lock())
+        } else {
+            let stream = std::fs::File::create(self.dest_path)?;
+            Box::new(stream)
+        };
+
+        let serialized = doc.with_document(|md| md.save());
+
+        dest.write_all(&serialized)?;
 
         repo.stop().await;
         Ok(())
