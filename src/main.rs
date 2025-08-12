@@ -200,8 +200,6 @@ impl HistoryCommand {
         let maybe_doc = repo.samod().find(docid).await?;
         let doc = maybe_doc.ok_or_else(|| anyhow!("doc not found"))?;
 
-        eprintln!("XXX this causes the document to need to be refetched!\n");
-
         doc.with_document(|md| {
             let enc = md.text_encoding();
 
