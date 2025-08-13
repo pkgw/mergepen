@@ -6,7 +6,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-mod doctypes;
+mod doc_repo;
+mod doc_types;
 mod repo;
 
 #[derive(Parser, Debug)]
@@ -60,8 +61,9 @@ struct CatCommand {
 impl CatCommand {
     async fn exec(self) -> Result<()> {
         let docid = self.docid.parse()?;
-        let repo = repo::Repository::load().await?;
-        let maybe_doc = repo.samod().find(docid).await?;
+        let repo = repo::Repository::get()?;
+        let docs = repo.load_doc_repo().await?;
+        let maybe_doc = docs.samod().find(docid).await?;
         let doc = maybe_doc.ok_or_else(|| anyhow!("doc not found"))?;
 
         doc.with_document(|md| {
@@ -70,7 +72,7 @@ impl CatCommand {
             println!("{content:?}");
         });
 
-        repo.stop().await;
+        docs.stop().await;
         Ok(())
     }
 }
@@ -85,15 +87,16 @@ struct DumpCommand {
 impl DumpCommand {
     async fn exec(self) -> Result<()> {
         let docid = self.docid.parse()?;
-        let repo = repo::Repository::load().await?;
-        let maybe_doc = repo.samod().find(docid).await?;
+        let repo = repo::Repository::get()?;
+        let docs = repo.load_doc_repo().await?;
+        let maybe_doc = docs.samod().find(docid).await?;
         let doc = maybe_doc.ok_or_else(|| anyhow!("doc not found"))?;
 
         doc.with_document(|md| {
             md.dump();
         });
 
-        repo.stop().await;
+        docs.stop().await;
         Ok(())
     }
 }
@@ -111,8 +114,9 @@ struct ExportCommand {
 impl ExportCommand {
     async fn exec(self) -> Result<()> {
         let docid = self.docid.parse()?;
-        let repo = repo::Repository::load().await?;
-        let maybe_doc = repo.samod().find(docid).await?;
+        let repo = repo::Repository::get()?;
+        let docs = repo.load_doc_repo().await?;
+        let maybe_doc = docs.samod().find(docid).await?;
         let doc = maybe_doc.ok_or_else(|| anyhow!("doc not found"))?;
 
         let mut dest: Box<dyn Write> = if self.dest_path == Path::new("-") {
@@ -126,7 +130,7 @@ impl ExportCommand {
 
         dest.write_all(&serialized)?;
 
-        repo.stop().await;
+        docs.stop().await;
         Ok(())
     }
 }
@@ -148,16 +152,18 @@ impl FetchCommand {
     async fn exec(self) -> Result<()> {
         let docid = self.docid.parse()?;
 
-        let repo = repo::Repository::load().await?;
-        repo.connect_websocket(&self.url, self.peerid.as_ref())
+        let repo = repo::Repository::get()?;
+        let docs = repo.load_doc_repo().await?;
+
+        docs.connect_websocket(&self.url, self.peerid.as_ref())
             .await?;
 
-        let maybe_doc = repo.samod().find(docid).await?;
+        let maybe_doc = docs.samod().find(docid).await?;
 
         let doc = maybe_doc.ok_or_else(|| anyhow!("doc not found"))?;
         println!("{}", doc.url());
 
-        repo.stop().await;
+        docs.stop().await;
         Ok(())
     }
 }
@@ -172,8 +178,9 @@ struct HeadsCommand {
 impl HeadsCommand {
     async fn exec(self) -> Result<()> {
         let docid = self.docid.parse()?;
-        let repo = repo::Repository::load().await?;
-        let maybe_doc = repo.samod().find(docid).await?;
+        let repo = repo::Repository::get()?;
+        let docs = repo.load_doc_repo().await?;
+        let maybe_doc = docs.samod().find(docid).await?;
         let doc = maybe_doc.ok_or_else(|| anyhow!("doc not found"))?;
 
         doc.with_document(|md| {
@@ -182,7 +189,7 @@ impl HeadsCommand {
             }
         });
 
-        repo.stop().await;
+        docs.stop().await;
         Ok(())
     }
 }
@@ -197,8 +204,9 @@ struct HistoryCommand {
 impl HistoryCommand {
     async fn exec(self) -> Result<()> {
         let docid = self.docid.parse()?;
-        let repo = repo::Repository::load().await?;
-        let maybe_doc = repo.samod().find(docid).await?;
+        let repo = repo::Repository::get()?;
+        let docs = repo.load_doc_repo().await?;
+        let maybe_doc = docs.samod().find(docid).await?;
         let doc = maybe_doc.ok_or_else(|| anyhow!("doc not found"))?;
 
         doc.with_document(|md| {
@@ -209,7 +217,7 @@ impl HistoryCommand {
             }
         });
 
-        repo.stop().await;
+        docs.stop().await;
         Ok(())
     }
 }
