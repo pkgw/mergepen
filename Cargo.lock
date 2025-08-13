@@ -685,6 +685,8 @@ dependencies = [
  "openat",
  "samod",
  "samod-core",
+ "serde",
+ "serde-automerge",
  "tokio",
  "tokio-tungstenite",
  "tracing-subscriber",
@@ -1061,6 +1063,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f0e2c6ed6606019b4e29e69dbaba95b11854410e5347d525002456dbbb786b6"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-automerge"
+version = "0.1.0"
+dependencies = [
+ "automerge",
+ "serde",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

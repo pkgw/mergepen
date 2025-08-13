@@ -6,6 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod doctypes;
 mod repo;
 
 #[derive(Parser, Debug)]

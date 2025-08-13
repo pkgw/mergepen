@@ -11,6 +11,8 @@ futures = "0.3.31"
 openat = "0.1"
 samod-core = { path = "../samod/samod-core" }
 samod = { path = "../samod/samod", features = ["tokio", "tungstenite"] }
+serde = { version = "1", features = ["derive"] }
+serde-automerge = { path = "../serde-automerge" }
 #thiserror = "2"
 tokio = { version = "1.47.1", features = [
     "macros",
