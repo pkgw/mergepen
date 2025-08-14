@@ -5,66 +5,86 @@
 //!
 //! Etc.
 
+use samod_core::AutomergeUrl;
 use serde::{Deserialize, Serialize};
+use serde_automerge::de::Deserializer;
 use std::collections::HashMap;
 
+use crate::repo::deserialize_from_str;
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct PatchworkMetadata {
-    suggested_import_url: String,
+pub struct PatchworkMetadata {
+    pub suggested_import_url: String,
 
     #[serde(rename = "type")]
-    type_: String,
+    pub type_: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+// No Serialize because I need to implement serialize-with here ...
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct EssayDoc {
-    tags: Vec<String>,
-    change_group_summaries: HashMap<String, String>,
-    version_control_metadata_url: String,
+pub struct EssayDoc {
+    pub tags: Vec<String>,
+    pub change_group_summaries: HashMap<String, String>,
+    #[serde(deserialize_with = "deserialize_from_str")]
+    pub version_control_metadata_url: AutomergeUrl,
 
     #[serde(rename = "@patchwork")]
-    patchwork: PatchworkMetadata,
-    discussions: HashMap<String, String>,
+    pub patchwork: PatchworkMetadata,
+    pub discussions: HashMap<String, String>,
 
-    content: String,
-    comment_threads: HashMap<String, String>,
+    pub content: String,
+    pub comment_threads: HashMap<String, String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+// No Serialize because I need to implement serialize-with here ...
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FolderItem {
+pub struct FolderItem {
     /// The title of the contained item
-    name: String,
+    pub name: String,
 
     /// The `automerge:...` URL of the item
-    url: String,
+    #[serde(deserialize_with = "deserialize_from_str")]
+    pub url: AutomergeUrl,
 
     /// The type of the item: `essay`, ...
 
     #[serde(rename = "type")]
-    type_: String,
+    pub type_: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+// No Serialize because I need to implement serialize-with here ...
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FolderDoc {
-    tags: Vec<String>,
-    change_group_summaries: HashMap<String, String>,
-    version_control_metadata_url: String,
+pub struct FolderDoc {
+    pub tags: Vec<String>,
+    pub change_group_summaries: HashMap<String, String>,
+    pub version_control_metadata_url: String,
 
     #[serde(rename = "@patchwork")]
-    patchwork: PatchworkMetadata,
-    discussions: HashMap<String, String>,
+    pub patchwork: PatchworkMetadata,
+    pub discussions: HashMap<String, String>,
 
-    title: String,
-    docs: Vec<FolderItem>,
+    pub title: String,
+    pub docs: Vec<FolderItem>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct VersionControlMetadataDoc {
-    is_branch_scope: bool,
-    change_group_summaries: HashMap<String, String>,
+pub struct VersionControlMetadataDoc {
+    pub is_branch_scope: bool,
+    pub change_group_summaries: HashMap<String, String>,
+}
+
+pub trait DocHandleExt {
+    fn as_folder(&self) -> Option<FolderDoc>;
+}
+
+impl DocHandleExt for samod::DocHandle {
+    fn as_folder(&self) -> Option<FolderDoc> {
+        self.with_document(|md| FolderDoc::deserialize(Deserializer::new_root(md)))
+            .ok()
+    }
 }

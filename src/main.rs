@@ -38,6 +38,9 @@ enum Subcommands {
     /// Dump patches bringing a document to its current state.
     History(HistoryCommand),
 
+    /// Dump the folder hierarchy.
+    TreeDump(TreeDumpCommand),
+
     /// Watch for changes to a document.
     Watch(WatchCommand),
 }
@@ -51,6 +54,7 @@ impl Subcommands {
             Subcommands::Fetch(a) => a.exec().await,
             Subcommands::Heads(a) => a.exec().await,
             Subcommands::History(a) => a.exec().await,
+            Subcommands::TreeDump(a) => a.exec().await,
             Subcommands::Watch(a) => a.exec().await,
         }
     }
@@ -221,6 +225,42 @@ impl HistoryCommand {
                 println!("{patch:?}");
             }
         });
+
+        docs.stop().await;
+        Ok(())
+    }
+}
+
+#[derive(Parser, Debug)]
+#[command()]
+struct TreeDumpCommand {
+    #[arg()]
+    url: String,
+
+    #[arg()]
+    peerid: String,
+}
+
+impl TreeDumpCommand {
+    async fn exec(self) -> Result<()> {
+        let repo = repo::Repository::get()?;
+        let docs = repo.load_doc_repo().await?;
+
+        docs.connect_websocket(&self.url, self.peerid.as_ref())
+            .await?;
+
+        repo.visit(&docs, |item| {
+            let mut path = item.parents.join(" >> ");
+
+            if path.len() > 0 {
+                path.push_str(" >> ");
+            }
+
+            path.push_str(&item.name);
+
+            println!("{path} {} ({})", item.doc_id, item.type_,);
+        })
+        .await?;
 
         docs.stop().await;
         Ok(())
