@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow};
 use automerge::patches::TextRepresentation;
 use clap::Parser;
+use futures::prelude::stream::StreamExt;
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -36,6 +37,9 @@ enum Subcommands {
 
     /// Dump patches bringing a document to its current state.
     History(HistoryCommand),
+
+    /// Watch for changes to a document.
+    Watch(WatchCommand),
 }
 
 impl Subcommands {
@@ -47,6 +51,7 @@ impl Subcommands {
             Subcommands::Fetch(a) => a.exec().await,
             Subcommands::Heads(a) => a.exec().await,
             Subcommands::History(a) => a.exec().await,
+            Subcommands::Watch(a) => a.exec().await,
         }
     }
 }
@@ -216,6 +221,43 @@ impl HistoryCommand {
                 println!("{patch:?}");
             }
         });
+
+        docs.stop().await;
+        Ok(())
+    }
+}
+
+#[derive(Parser, Debug)]
+#[command()]
+struct WatchCommand {
+    #[arg()]
+    url: String,
+
+    #[arg()]
+    peerid: String,
+
+    #[arg()]
+    docid: String,
+}
+
+impl WatchCommand {
+    async fn exec(self) -> Result<()> {
+        let docid = self.docid.parse()?;
+
+        let repo = repo::Repository::get()?;
+        let docs = repo.load_doc_repo().await?;
+
+        docs.connect_websocket(&self.url, self.peerid.as_ref())
+            .await?;
+
+        let maybe_doc = docs.samod().find(docid).await?;
+
+        let doc = maybe_doc.ok_or_else(|| anyhow!("doc not found"))?;
+        let mut changes = doc.changes();
+
+        while let Some(change) = changes.next().await {
+            println!("{change:?}");
+        }
 
         docs.stop().await;
         Ok(())
