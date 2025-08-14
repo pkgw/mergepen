@@ -7,6 +7,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::doc_types::DocHandleExt;
+
 mod doc_repo;
 mod doc_types;
 mod repo;
@@ -22,6 +24,9 @@ struct Args {
 enum Subcommands {
     /// Dump a document to stdout as automerge JSON.
     Cat(CatCommand),
+
+    /// Check out the folder structure as work-tree files
+    Checkout(CheckoutCommand),
 
     /// Dump a document using Automerge's internal format.
     Dump(DumpCommand),
@@ -49,6 +54,7 @@ impl Subcommands {
     async fn exec(self) -> Result<()> {
         match self {
             Subcommands::Cat(a) => a.exec().await,
+            Subcommands::Checkout(a) => a.exec().await,
             Subcommands::Dump(a) => a.exec().await,
             Subcommands::Export(a) => a.exec().await,
             Subcommands::Fetch(a) => a.exec().await,
@@ -80,6 +86,46 @@ impl CatCommand {
             // TODO: pretty-print!
             println!("{content:?}");
         });
+
+        docs.stop().await;
+        Ok(())
+    }
+}
+
+#[derive(Parser, Debug)]
+#[command()]
+struct CheckoutCommand {
+    #[arg()]
+    url: String,
+
+    #[arg()]
+    peerid: String,
+}
+
+impl CheckoutCommand {
+    async fn exec(self) -> Result<()> {
+        let repo = repo::Repository::get()?;
+        let docs = repo.load_doc_repo().await?;
+
+        docs.connect_websocket(&self.url, self.peerid.as_ref())
+            .await?;
+
+        repo.visit(&docs, |item| {
+            if let Some(essay) = item.doc.as_essay() {
+                let mut path = repo.work_root().to_owned();
+
+                for sub in &item.parents[1..] {
+                    path.push(sub);
+                }
+
+                std::fs::create_dir_all(&path).expect("mkdir");
+
+                path.push(&item.name);
+
+                std::fs::write(&path, essay.content.as_bytes()).expect("write");
+            }
+        })
+        .await?;
 
         docs.stop().await;
         Ok(())
@@ -258,7 +304,7 @@ impl TreeDumpCommand {
 
             path.push_str(&item.name);
 
-            println!("{path} {} ({})", item.doc_id, item.type_,);
+            println!("{path} {} ({})", item.doc.document_id(), item.type_,);
         })
         .await?;
 

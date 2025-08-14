@@ -61,7 +61,8 @@ pub struct FolderItem {
 pub struct FolderDoc {
     pub tags: Vec<String>,
     pub change_group_summaries: HashMap<String, String>,
-    pub version_control_metadata_url: String,
+    #[serde(deserialize_with = "deserialize_from_str")]
+    pub version_control_metadata_url: AutomergeUrl,
 
     #[serde(rename = "@patchwork")]
     pub patchwork: PatchworkMetadata,
@@ -80,11 +81,17 @@ pub struct VersionControlMetadataDoc {
 
 pub trait DocHandleExt {
     fn as_folder(&self) -> Option<FolderDoc>;
+    fn as_essay(&self) -> Option<EssayDoc>;
 }
 
 impl DocHandleExt for samod::DocHandle {
     fn as_folder(&self) -> Option<FolderDoc> {
         self.with_document(|md| FolderDoc::deserialize(Deserializer::new_root(md)))
+            .ok()
+    }
+
+    fn as_essay(&self) -> Option<EssayDoc> {
+        self.with_document(|md| EssayDoc::deserialize(Deserializer::new_root(md)))
             .ok()
     }
 }

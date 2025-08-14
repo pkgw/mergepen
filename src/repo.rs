@@ -2,7 +2,7 @@
 //! Automerge/Samod document repository.
 
 use anyhow::{Result, anyhow};
-use samod::DocumentId;
+use samod::{DocHandle, DocumentId};
 use serde::{
     Deserialize, Deserializer, Serialize,
     de::{Error as DeError, Visitor},
@@ -11,7 +11,7 @@ use std::{
     collections::HashSet,
     fmt::{self, Display},
     marker::PhantomData,
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
 };
 
@@ -65,7 +65,7 @@ pub struct Repository {
 pub struct VisitNode<'a> {
     pub name: String,
     pub type_: String,
-    pub doc_id: DocumentId,
+    pub doc: DocHandle,
     pub parents: Vec<String>,
     pub repo: &'a Repository,
     pub doc_repo: &'a DocRepo,
@@ -99,6 +99,10 @@ impl Repository {
         Ok(repo)
     }
 
+    pub fn work_root(&self) -> &Path {
+        &self.work_root
+    }
+
     pub fn doc_repo_root(&self) -> PathBuf {
         let mut p = self.repo_root.clone();
         p.push("docs");
@@ -124,27 +128,32 @@ impl Repository {
             .as_folder()
             .ok_or_else(|| anyhow!("root doc is not a folder"))?;
 
-        let mut queue = vec![VisitNode {
+        struct VisitRec {
+            pub name: String,
+            pub type_: String,
+            pub doc_id: DocumentId,
+            pub parents: Vec<String>,
+        }
+
+        let mut queue = vec![VisitRec {
             name: root_folder.title.clone(),
             type_: "folder".to_owned(),
             doc_id: self.config.root_folder_id.clone(),
             parents: vec![],
-            repo: self,
-            doc_repo: doc_repo,
         }];
 
-        while let Some(next) = queue.pop() {
-            seen_ids.insert(next.doc_id.clone());
+        while let Some(rec) = queue.pop() {
+            seen_ids.insert(rec.doc_id.clone());
 
             let this_doc = doc_repo
                 .samod()
-                .find(next.doc_id.clone())
+                .find(rec.doc_id.clone())
                 .await?
                 .ok_or_else(|| anyhow!("doc not found"))?;
 
             if let Some(this_folder) = this_doc.as_folder() {
-                let mut parents = next.parents.clone();
-                parents.push(next.name.clone());
+                let mut parents = rec.parents.clone();
+                parents.push(rec.name.clone());
 
                 for item in &this_folder.docs {
                     let doc_id = item.url.document_id().clone();
@@ -153,18 +162,23 @@ impl Repository {
                         return Err(anyhow!("circular folder structure"));
                     }
 
-                    queue.push(VisitNode {
+                    queue.push(VisitRec {
                         name: item.name.clone(),
                         type_: item.type_.clone(),
                         doc_id,
                         parents: parents.clone(),
-                        repo: self,
-                        doc_repo,
                     });
                 }
             }
 
-            visitor(&next);
+            visitor(&VisitNode {
+                name: rec.name,
+                type_: rec.type_,
+                doc: this_doc,
+                parents: rec.parents,
+                repo: self,
+                doc_repo,
+            });
         }
 
         Ok(())
