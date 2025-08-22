@@ -12,6 +12,7 @@ use crate::doc_types::DocHandleExt;
 mod doc_repo;
 mod doc_types;
 mod repo;
+mod sync_server;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -43,6 +44,9 @@ enum Subcommands {
     /// Dump patches bringing a document to its current state.
     History(HistoryCommand),
 
+    /// Start a websocket sync server.
+    Serve(ServeCommand),
+
     /// Dump the folder hierarchy.
     TreeDump(TreeDumpCommand),
 
@@ -60,6 +64,7 @@ impl Subcommands {
             Subcommands::Fetch(a) => a.exec().await,
             Subcommands::Heads(a) => a.exec().await,
             Subcommands::History(a) => a.exec().await,
+            Subcommands::Serve(a) => a.exec().await,
             Subcommands::TreeDump(a) => a.exec().await,
             Subcommands::Watch(a) => a.exec().await,
         }
@@ -273,6 +278,22 @@ impl HistoryCommand {
         });
 
         docs.stop().await;
+        Ok(())
+    }
+}
+
+#[derive(Parser, Debug)]
+#[command()]
+struct ServeCommand {}
+
+impl ServeCommand {
+    async fn exec(self) -> Result<()> {
+        let repo = repo::Repository::get()?;
+        let docs = repo.load_doc_repo().await?;
+        let server = sync_server::start_server(docs.into()).await;
+
+        // This should run forever:
+        server.await??;
         Ok(())
     }
 }

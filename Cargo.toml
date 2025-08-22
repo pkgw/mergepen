@@ -5,12 +5,13 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1"
+axum = { version = "0.8.4", features = ["ws"] }
 automerge = "0.6.1"
 clap = { version = "4.5.42", features = ["derive"] }
 futures = "0.3.31"
 openat = "0.1"
 samod-core = { path = "../samod/samod-core" }
-samod = { path = "../samod/samod", features = ["tokio", "tungstenite"] }
+samod = { path = "../samod/samod", features = ["axum", "tokio", "tungstenite"] }
 serde = { version = "1", features = ["derive"] }
 serde-automerge = { path = "../serde-automerge" }
 #thiserror = "2"

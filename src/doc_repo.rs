@@ -48,3 +48,9 @@ impl DocRepo {
         self.samod.stop().await
     }
 }
+
+impl Into<Samod> for DocRepo {
+    fn into(self) -> Samod {
+        self.samod
+    }
+}
